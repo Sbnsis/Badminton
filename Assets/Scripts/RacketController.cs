@@ -39,8 +39,10 @@ public class RacketController : MonoBehaviour
     public float rotateSpeed = 15f;
 
     [Header("击球方向")]
-    public Vector3 courtForward = new Vector3(0f, 0f, 1f);  // 对方半场方向（垂直球网）
-    public float racketInfluence = 0.5f;    // 球拍偏移对方向的影响强度 (0~1)
+    public Vector3 courtForward = new Vector3(1f, 0f, 0f);  // 对方半场方向（垂直球网）
+    public float racketInfluence = 0.8f;    // 球拍偏移对方向的影响强度
+    public float forwardBias = 2f;          // 向前分量加成（越大越往前飞）
+    public float lobUpBias = 0.8f;          // 高远球额外向上分量
 
     [Header("击球")]
     public float maxHitDistance = 5f;
@@ -238,10 +240,25 @@ public class RacketController : MonoBehaviour
             return;
         }
 
-        // 基础方向 = 对方半场，球拍偏移反向（弹弓：往后拉→往前打）
-        Vector3 racketOffset = racketPivot.localPosition - centerLocalPos; // 球拍相对中心
-        Vector3 racketWorldDir = cameraTransform.TransformDirection((-racketOffset).normalized); // 反向=弹弓
-        Vector3 hitDir = (courtForward.normalized + racketWorldDir * racketInfluence).normalized;
+        // 球拍偏移
+        Vector3 racketOffset = racketPivot.localPosition - centerLocalPos;
+
+        // 挥拍方向（局部空间）：从球拍位置 → 中心
+        Vector3 swingDirLocal = (-racketOffset).normalized;
+        Vector3 swingDirWorld = cameraTransform.TransformDirection(swingDirLocal);
+        Vector3 hitDir;
+
+        if (racketOffset.y > 0f)
+        {
+            // 扣杀（上往下）：挥拍方向 + 向前，压制向上
+            swingDirWorld.y = Mathf.Min(swingDirWorld.y, 0f);
+            hitDir = (swingDirWorld + cameraTransform.forward * forwardBias).normalized;
+        }
+        else
+        {
+            // 高远球（下往上）：纯挥拍方向，不加额外分量
+            hitDir = swingDirWorld;
+        }
 
         float maxPull = Mathf.Sqrt(pullRangeH * pullRangeH + pullRangeV * pullRangeV);
         float power = Mathf.Lerp(minPower, maxPower, Mathf.Clamp01(pullDist / maxPull));
